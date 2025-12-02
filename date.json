@@ -1,1 +1,22 @@
 
+{
+    "flows": [
+        {
+            "id": "flow-1764655432397",
+            "title": "建設環境",
+            "description": "建立Nv環境",
+            "startDate": "2025-11-27",
+            "endDate": "2025-12-09",
+            "progress": {
+                "steps": [
+                    "開始",
+                    "Getting Started With NVIDIA Cosmos for Windows (Beginner Tutorial)影片觀看",
+                    "自行架設",
+                    "測試環境",
+                    "結束"
+                ],
+                "currentStep": 2
+            }
+        }
+    ]
+}
