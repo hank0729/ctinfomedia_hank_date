@@ -4,6 +4,30 @@
   <meta charset="UTF-8" />
   <title>hank的流程行程日曆</title>
   <style>
+
+.calendar-days button.has-leave::before{
+  content:"";
+  position:absolute;
+  width:6px;
+  height:6px;
+  border-radius:999px;
+  background:#4dabff; 
+  bottom:4px;
+  left:calc(50% - 7px);
+}
+
+.calendar-days button.has-flow::after{
+  content:"";
+  position:absolute;
+  width:6px;
+  height:6px;
+  border-radius:999px;
+  background:#ff6b6b;
+  bottom:4px;
+  left:calc(50% + 7px); /* 右邊一顆 */
+}
+
+    
 body.app-mode {
   background: #101010;
   padding: 0;
