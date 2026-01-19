@@ -935,7 +935,6 @@ body {
         card.appendChild(desc);
       }
 
-      // ✅ 請假資訊（顯示條件：enabled=true 且 rangeMode=always 或者點選日期在流程期間內）
       const leaveInfo = buildLeaveTextIfNeeded(flow, dateStr);
       if (leaveInfo) {
         const leaveEl = document.createElement("div");
@@ -944,7 +943,6 @@ body {
         card.appendChild(leaveEl);
       }
 
-      // ✅ 進度（支援 completed: currentStep === steps.length）
       if (flow.progress && Array.isArray(flow.progress.steps) && flow.progress.steps.length > 0) {
         const steps = flow.progress.steps;
 
@@ -1044,33 +1042,52 @@ body {
     return new Date(y, m - 1, d);
   }
 
-  // ✅ 請假顯示規則
-  function buildLeaveTextIfNeeded(flow, clickedDateStr) {
-    const leave = flow && flow.leave ? flow.leave : null;
-    if (!leave || leave.enabled !== true) return "";
+ function buildLeaveTextIfNeeded(flow, clickedDateStr) {
+  const leave = flow && flow.leave ? flow.leave : null;
+  if (!leave || leave.enabled !== true) return "";
 
-    const label = leave.label || "請假";
-    const note = (leave.note || "").trim();
+  const label = leave.label || "請假";
+  const note = (leave.note || "").trim();
 
-    const rangeMode = leave.rangeMode || "auto";
+  const clicked = parseDateStr(clickedDateStr);
+  if (!clicked) return "";
 
-    if (rangeMode === "always") {
-      return note ? `【${label}】${note}` : `【${label}】`;
-    }
+  if (Array.isArray(leave.dates) && leave.dates.length > 0) {
+    const inAnyRange = leave.dates.some(r => {
+      if (!r || !r.start) return false;
+      const s = parseDateStr(r.start);
+      const e = parseDateStr(r.end || r.start);
+      if (!s || !e) return false;
 
-    // auto：只有點選日期在流程期間內才顯示
-    if (!flow.startDate || !flow.endDate) return note ? `【${label}】${note}` : `【${label}】`;
+      const start = s <= e ? s : e;
+      const end = s <= e ? e : s;
 
-    const s = parseDateStr(flow.startDate);
-    const e = parseDateStr(flow.endDate);
-    const c = parseDateStr(clickedDateStr);
-    if (!s || !e || !c) return "";
+      return clicked >= start && clicked <= end;
+    });
 
-    if (c >= s && c <= e) {
-      return note ? `【${label}】${note}` : `【${label}】`;
-    }
-    return "";
+    if (!inAnyRange) return "";
+
+    return note ? `【${label}】${note}` : `【${label}】`;
   }
+
+  const rangeMode = leave.rangeMode || "auto";
+
+  if (rangeMode === "always") {
+    return note ? `【${label}】${note}` : `【${label}】`;
+  }
+
+  if (!flow.startDate || !flow.endDate) return note ? `【${label}】${note}` : `【${label}】`;
+
+  const s = parseDateStr(flow.startDate);
+  const e = parseDateStr(flow.endDate);
+  if (!s || !e) return "";
+
+  if (clicked >= s && clicked <= e) {
+    return note ? `【${label}】${note}` : `【${label}】`;
+  }
+
+  return "";
+}
 
   prevMonthBtn.addEventListener("click", () => {
     currentDate.setMonth(currentDate.getMonth() - 1);
@@ -1131,7 +1148,6 @@ body {
     modalFlowTitleEl.textContent = title;
     modalFlowDateRangeEl.textContent = `流程期間：${flow.startDate} ～ ${flow.endDate}`;
 
-    // ✅ modal description（把請假資訊也合併顯示）
     const baseDesc =
       flow.description && flow.description.trim()
         ? flow.description.trim()
