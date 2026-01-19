@@ -24,7 +24,7 @@
   border-radius:999px;
   background:#ff6b6b;
   bottom:4px;
-  left:calc(50% + 7px); /* 右邊一顆 */
+  left:calc(50% + 7px); 
 }
 
     
@@ -100,7 +100,6 @@ body.app-mode .nav-buttons button:hover {
   background: #2a2a2a;
 }
 
-/* Modal 在 app-mode 下的樣式 */
 body.app-mode .modal-card {
   background: #202020;
   color: #f5f5f5;
@@ -301,7 +300,6 @@ body {
   padding-right: 6px;
 }
 
-/* 滾動條美化（桌面時） */
 .events-list::-webkit-scrollbar {
   width: 6px;
 }
@@ -823,11 +821,9 @@ body {
 
   let currentDate = new Date();
 
-  // 兩種資料
-  let flows = [];       // 一般流程
-  let leaveFlows = [];  // 請假流程（獨立）
+  let flows = [];      
+  let leaveFlows = [];  
 
-  // 日期 -> items（一般流程 + 請假）
   let itemsByDate = {};
 
   let selectedDateStr = "";
@@ -979,7 +975,6 @@ if (hasLeave) btn.classList.add("has-leave");
     });
   }
 
-  // ---- 一般流程卡片 ----
   function renderFlowCard(item, index, dateStr) {
     const flow = item.data;
 
@@ -1002,8 +997,7 @@ if (hasLeave) btn.classList.add("has-leave");
       desc.textContent = flow.description;
       card.appendChild(desc);
     }
-
-    // ✅ 進度（支援 completed：currentStep === steps.length）
+   
     if (flow.progress && Array.isArray(flow.progress.steps) && flow.progress.steps.length > 0) {
       const steps = flow.progress.steps;
 
@@ -1079,7 +1073,6 @@ if (hasLeave) btn.classList.add("has-leave");
     eventsListEl.appendChild(card);
   }
 
-  // ---- 請假卡片 ----
   function renderLeaveCard(item, index, dateStr) {
     const lv = item.data;
 
@@ -1091,7 +1084,6 @@ if (hasLeave) btn.classList.add("has-leave");
     title.textContent = `${index + 1}. ${lv.title || "請假"}`;
     card.appendChild(title);
 
-    // 顯示該筆請假區間（若 item.range 有帶）
     const range = document.createElement("div");
     range.className = "flow-date-range";
     if (item.range) {
@@ -1149,7 +1141,6 @@ if (hasLeave) btn.classList.add("has-leave");
     showItemsForDate(selectedDateStr);
   });
 
-  // ---- PWA app-mode ----
   function applyAppModeIfNeeded() {
     const isStandaloneDisplayMode =
       window.matchMedia &&
@@ -1172,7 +1163,6 @@ if (hasLeave) btn.classList.add("has-leave");
       .addEventListener("change", applyAppModeIfNeeded);
   }
 
-  // ---- Modal ----
   const flowModalBackdrop = document.getElementById("flowModalBackdrop");
   const modalFlowTitleEl = document.getElementById("modalFlowTitle");
   const modalFlowSubtitleEl = document.getElementById("modalFlowSubtitle");
@@ -1300,7 +1290,6 @@ if (hasLeave) btn.classList.add("has-leave");
     flowModalBackdrop.classList.add("show");
   }
 
-  // ✅ 用同一個 modal 來顯示請假（不顯示 steps）
   function openLeaveModal(lv, range) {
     modalFlowTitleEl.textContent = lv.title || "請假";
     if (range) modalFlowDateRangeEl.textContent = `請假區間：${range.start} ～ ${range.end}`;
@@ -1313,7 +1302,6 @@ if (hasLeave) btn.classList.add("has-leave");
     modalFlowSubtitleEl.textContent = "請假";
     modalStepMetaEl.textContent = "狀態：請假";
 
-    // 不顯示步驟
     modalStepsEl.innerHTML = "";
     const li = document.createElement("li");
     li.className = "modal-step current";
