@@ -17,6 +17,19 @@
                 ],
                 "currentStep": 2
             }
+        },
+        {
+            "id": "flow-1764655432888",
+            "title": "理解專案內容",
+            "description": "準備開始專案開發",
+            "startDate": "2026-01-15",
+            "endDate": "2026-01-15",
+            "progress": {
+                "steps": [
+                    "已理解"
+                ],
+                "currentStep": 1
+            }
         }
     ]
 }
