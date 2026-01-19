@@ -850,11 +850,9 @@ body {
     }
   }
 
-  // ---- 日期 map：一般流程（startDate/endDate）+ 請假（dates[]） ----
   function buildItemsByDate(flowsArray, leaveArray) {
     const map = {};
-
-    // 1) 一般流程：用 startDate/endDate 展開
+  
     flowsArray.forEach(flow => {
       if (!flow.startDate || !flow.endDate) return;
 
@@ -871,7 +869,6 @@ body {
       }
     });
 
-    // 2) 請假：用 dates[] 展開
     leaveArray.forEach(lv => {
       if (!Array.isArray(lv.dates) || lv.dates.length === 0) return;
 
@@ -895,10 +892,9 @@ body {
       });
     });
 
-    // 可選：排序（讓請假顯示在最上或最後）
     Object.keys(map).forEach(ds => {
       map[ds].sort((a, b) => {
-        const order = { leave: 0, flow: 1 }; // 想請假顯示最上面就 leave:0
+        const order = { leave: 0, flow: 1 }; 
         return (order[a.type] ?? 99) - (order[b.type] ?? 99);
       });
     });
@@ -941,8 +937,13 @@ body {
 
       if (dateStr === todayStr) btn.classList.add("today");
 
-      // 有任何 item（流程或請假）就打點
-      if (itemsByDate[dateStr]) btn.classList.add("has-flow");
+const items = itemsByDate[dateStr] || [];
+const hasFlow = items.some(x => x.type === "flow");
+const hasLeave = items.some(x => x.type === "leave");
+
+if (hasFlow) btn.classList.add("has-flow");
+if (hasLeave) btn.classList.add("has-leave");
+
 
       if (selectedDateStr === dateStr) btn.classList.add("selected");
 
