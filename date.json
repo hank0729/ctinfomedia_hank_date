@@ -47,7 +47,39 @@
                 ],
                 "currentStep": 3
             }
-        }
+        },
+        {
+            "id": "flow-1764655432900",
+            "title": "編制物理量演算",
+            "description": "物理演算法開發",
+            "startDate": "2026-01-21",
+            "endDate": "2026-01-23",
+            "progress": {
+                "steps": [
+                    "分析所有資料",
+                    "編制演算法計算物理撞擊",
+                    "測試演算法",
+                    "編制完畢"
+                ],
+                "currentStep": 0
+            }
+        },
+         {
+            "id": "flow-1764655432901",
+            "title": "整合演算法",
+            "description": "演算法結合後端",
+            "startDate": "2026-01-26",
+            "endDate": "2026-01-28",
+            "progress": {
+                "steps": [
+                    "將演算法轉寫成C",
+                    "演算法嵌入",
+                    "測試程式",
+                    "結合完畢"
+                ],
+                "currentStep": 0
+            }
+         }
     ],
     "leaveFlows": [
     {
