@@ -784,7 +784,9 @@ body {
       </div>
     </div>
   </div>
-<script>
+
+
+  <script>
   const monthYearEl = document.getElementById("monthYear");
   const todayTextEl = document.getElementById("todayText");
   const calendarDaysEl = document.getElementById("calendarDays");
@@ -796,16 +798,26 @@ body {
   const todayBtn = document.getElementById("todayBtn");
 
   let currentDate = new Date();
-  let flows = [];
-  let flowsByDate = {};
+
+  // 兩種資料
+  let flows = [];       // 一般流程
+  let leaveFlows = [];  // 請假流程（獨立）
+
+  // 日期 -> items（一般流程 + 請假）
+  let itemsByDate = {};
+
   let selectedDateStr = "";
 
   async function loadFlows() {
     try {
       const res = await fetch("date.json");
       const data = await res.json();
-      flows = data.flows || [];
-      flowsByDate = buildFlowsByDate(flows);
+
+      flows = Array.isArray(data.flows) ? data.flows : [];
+      leaveFlows = Array.isArray(data.leaveFlows) ? data.leaveFlows : [];
+
+      itemsByDate = buildItemsByDate(flows, leaveFlows);
+
       renderCalendar(currentDate);
     } catch (err) {
       console.error("載入 date.json 失敗：", err);
@@ -814,9 +826,12 @@ body {
     }
   }
 
-  function buildFlowsByDate(flowsArray) {
+  // ---- 日期 map：一般流程（startDate/endDate）+ 請假（dates[]） ----
+  function buildItemsByDate(flowsArray, leaveArray) {
     const map = {};
-    flowsArray.forEach((flow) => {
+
+    // 1) 一般流程：用 startDate/endDate 展開
+    flowsArray.forEach(flow => {
       if (!flow.startDate || !flow.endDate) return;
 
       const start = parseDateStr(flow.startDate);
@@ -827,10 +842,43 @@ body {
       while (cur <= end) {
         const ds = formatDateStr(cur);
         if (!map[ds]) map[ds] = [];
-        map[ds].push(flow);
+        map[ds].push({ type: "flow", data: flow });
         cur.setDate(cur.getDate() + 1);
       }
     });
+
+    // 2) 請假：用 dates[] 展開
+    leaveArray.forEach(lv => {
+      if (!Array.isArray(lv.dates) || lv.dates.length === 0) return;
+
+      lv.dates.forEach(r => {
+        if (!r || !r.start) return;
+
+        const s0 = parseDateStr(r.start);
+        const e0 = parseDateStr(r.end || r.start);
+        if (!s0 || !e0) return;
+
+        const start = s0 <= e0 ? s0 : e0;
+        const end = s0 <= e0 ? e0 : s0;
+
+        const cur = new Date(start.getTime());
+        while (cur <= end) {
+          const ds = formatDateStr(cur);
+          if (!map[ds]) map[ds] = [];
+          map[ds].push({ type: "leave", data: lv, range: { start: r.start, end: r.end || r.start } });
+          cur.setDate(cur.getDate() + 1);
+        }
+      });
+    });
+
+    // 可選：排序（讓請假顯示在最上或最後）
+    Object.keys(map).forEach(ds => {
+      map[ds].sort((a, b) => {
+        const order = { leave: 0, flow: 1 }; // 想請假顯示最上面就 leave:0
+        return (order[a.type] ?? 99) - (order[b.type] ?? 99);
+      });
+    });
+
     return map;
   }
 
@@ -844,18 +892,8 @@ body {
     const daysInMonth = lastDayOfMonth.getDate();
 
     const monthNames = [
-      "一月",
-      "二月",
-      "三月",
-      "四月",
-      "五月",
-      "六月",
-      "七月",
-      "八月",
-      "九月",
-      "十月",
-      "十一月",
-      "十二月",
+      "一月","二月","三月","四月","五月","六月",
+      "七月","八月","九月","十月","十一月","十二月"
     ];
 
     monthYearEl.textContent = `${year}年 ${monthNames[month]}`;
@@ -875,158 +913,181 @@ body {
       const btn = document.createElement("button");
       btn.textContent = d;
 
-      const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(
-        d
-      ).padStart(2, "0")}`;
+      const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
 
-      if (dateStr === todayStr) {
-        btn.classList.add("today");
-      }
+      if (dateStr === todayStr) btn.classList.add("today");
 
-      if (flowsByDate[dateStr]) {
-        btn.classList.add("has-flow");
-      }
+      // 有任何 item（流程或請假）就打點
+      if (itemsByDate[dateStr]) btn.classList.add("has-flow");
 
-      if (selectedDateStr === dateStr) {
-        btn.classList.add("selected");
-      }
+      if (selectedDateStr === dateStr) btn.classList.add("selected");
 
       btn.addEventListener("click", () => {
         selectedDateStr = dateStr;
         renderCalendar(currentDate);
-        showFlowsForDate(dateStr);
+        showItemsForDate(dateStr);
       });
 
       calendarDaysEl.appendChild(btn);
     }
   }
 
-  function showFlowsForDate(dateStr) {
+  function showItemsForDate(dateStr) {
     selectedDateTitleEl.textContent = dateStr;
-    const list = flowsByDate[dateStr] || [];
+    const list = itemsByDate[dateStr] || [];
 
     if (list.length === 0) {
       eventsListEl.innerHTML =
-        '<p class="no-events">這一天目前沒有流程。</p>' +
-        '<p class="hint-text">若要新增，請在 <code>date.json</code> 中加入流程，並設定 startDate/endDate。</p>';
+        '<p class="no-events">這一天目前沒有流程或請假。</p>' +
+        '<p class="hint-text">若要新增，請在 <code>date.json</code> 中加入 flows 或 leaveFlows。</p>';
       return;
     }
 
     eventsListEl.innerHTML = "";
 
-    list.forEach((flow, index) => {
-      const card = document.createElement("div");
-      card.className = "flow-card";
-
-      const title = document.createElement("div");
-      title.className = "flow-title";
-      title.textContent = `${index + 1}. ${flow.title || "未命名流程"}`;
-      card.appendChild(title);
-
-      const range = document.createElement("div");
-      range.className = "flow-date-range";
-      range.textContent = `流程期間：${flow.startDate} ～ ${flow.endDate}`;
-      card.appendChild(range);
-
-      if (flow.description) {
-        const desc = document.createElement("div");
-        desc.className = "flow-description";
-        desc.textContent = flow.description;
-        card.appendChild(desc);
-      }
-
-      const leaveInfo = buildLeaveTextIfNeeded(flow, dateStr);
-      if (leaveInfo) {
-        const leaveEl = document.createElement("div");
-        leaveEl.className = "flow-description";
-        leaveEl.textContent = leaveInfo;
-        card.appendChild(leaveEl);
-      }
-
-      if (flow.progress && Array.isArray(flow.progress.steps) && flow.progress.steps.length > 0) {
-        const steps = flow.progress.steps;
-
-        const rawStep = Number.isFinite(flow.progress.currentStep)
-          ? flow.progress.currentStep
-          : 0;
-
-        const currentStep = Math.min(Math.max(0, rawStep), steps.length);
-        const isCompleted = currentStep >= steps.length;
-
-        const currentStepName = isCompleted
-          ? "已完成"
-          : steps[Math.max(0, Math.min(currentStep, steps.length - 1))];
-
-        const progressLabel = document.createElement("div");
-        progressLabel.className = "flow-progress-label";
-        progressLabel.textContent = isCompleted
-          ? `狀態：已完成（共 ${steps.length} 步）`
-          : `目前進度：第 ${currentStep + 1} 步 / 共 ${steps.length} 步（${currentStepName}）`;
-        card.appendChild(progressLabel);
-
-        const progressLine = document.createElement("div");
-        progressLine.className = "progress-line";
-
-        const track = document.createElement("div");
-        track.className = "progress-track";
-        progressLine.appendChild(track);
-
-        const trackFill = document.createElement("div");
-        trackFill.className = "progress-track-fill";
-
-        let fillPercent = 0;
-        if (steps.length <= 1) {
-          fillPercent = 100;
-        } else if (isCompleted) {
-          fillPercent = 100;
-        } else {
-          fillPercent = (currentStep / (steps.length - 1)) * 100;
-        }
-
-        trackFill.style.width = fillPercent + "%";
-        progressLine.appendChild(trackFill);
-
-        steps.forEach((stepName, idx) => {
-          const step = document.createElement("div");
-          step.className = "progress-step";
-
-          const dot = document.createElement("div");
-          dot.className = "progress-step-dot";
-          dot.textContent = idx + 1;
-
-          if (isCompleted || idx < currentStep) {
-            dot.classList.add("done");
-          } else if (idx === currentStep) {
-            dot.classList.add("current");
-          }
-
-          step.appendChild(dot);
-          progressLine.appendChild(step);
-        });
-
-        card.appendChild(progressLine);
-
-        const labelsRow = document.createElement("div");
-        labelsRow.className = "progress-steps-labels";
-        steps.forEach((stepName) => {
-          const span = document.createElement("span");
-          span.textContent = stepName;
-          labelsRow.appendChild(span);
-        });
-        card.appendChild(labelsRow);
+    list.forEach((item, index) => {
+      if (item.type === "leave") {
+        renderLeaveCard(item, index, dateStr);
       } else {
-        const noProgress = document.createElement("div");
-        noProgress.className = "flow-progress-label";
-        noProgress.textContent = "此流程尚未設定進度。";
-        card.appendChild(noProgress);
+        renderFlowCard(item, index, dateStr);
       }
+    });
+  }
 
-      card.addEventListener("click", () => {
-        openFlowModal(flow, dateStr);
+  // ---- 一般流程卡片 ----
+  function renderFlowCard(item, index, dateStr) {
+    const flow = item.data;
+
+    const card = document.createElement("div");
+    card.className = "flow-card";
+
+    const title = document.createElement("div");
+    title.className = "flow-title";
+    title.textContent = `${index + 1}. ${flow.title || "未命名流程"}`;
+    card.appendChild(title);
+
+    const range = document.createElement("div");
+    range.className = "flow-date-range";
+    range.textContent = `流程期間：${flow.startDate} ～ ${flow.endDate}`;
+    card.appendChild(range);
+
+    if (flow.description) {
+      const desc = document.createElement("div");
+      desc.className = "flow-description";
+      desc.textContent = flow.description;
+      card.appendChild(desc);
+    }
+
+    // ✅ 進度（支援 completed：currentStep === steps.length）
+    if (flow.progress && Array.isArray(flow.progress.steps) && flow.progress.steps.length > 0) {
+      const steps = flow.progress.steps;
+
+      const rawStep = Number.isFinite(flow.progress.currentStep)
+        ? flow.progress.currentStep
+        : 0;
+
+      const currentStep = Math.min(Math.max(0, rawStep), steps.length);
+      const isCompleted = currentStep >= steps.length;
+
+      const currentStepName = isCompleted
+        ? "已完成"
+        : steps[Math.max(0, Math.min(currentStep, steps.length - 1))];
+
+      const progressLabel = document.createElement("div");
+      progressLabel.className = "flow-progress-label";
+      progressLabel.textContent = isCompleted
+        ? `狀態：已完成（共 ${steps.length} 步）`
+        : `目前進度：第 ${currentStep + 1} 步 / 共 ${steps.length} 步（${currentStepName}）`;
+      card.appendChild(progressLabel);
+
+      const progressLine = document.createElement("div");
+      progressLine.className = "progress-line";
+
+      const track = document.createElement("div");
+      track.className = "progress-track";
+      progressLine.appendChild(track);
+
+      const trackFill = document.createElement("div");
+      trackFill.className = "progress-track-fill";
+
+      let fillPercent = 0;
+      if (steps.length <= 1) fillPercent = 100;
+      else if (isCompleted) fillPercent = 100;
+      else fillPercent = (currentStep / (steps.length - 1)) * 100;
+
+      trackFill.style.width = fillPercent + "%";
+      progressLine.appendChild(trackFill);
+
+      steps.forEach((stepName, idx) => {
+        const step = document.createElement("div");
+        step.className = "progress-step";
+
+        const dot = document.createElement("div");
+        dot.className = "progress-step-dot";
+        dot.textContent = idx + 1;
+
+        if (isCompleted || idx < currentStep) dot.classList.add("done");
+        else if (idx === currentStep) dot.classList.add("current");
+
+        step.appendChild(dot);
+        progressLine.appendChild(step);
       });
 
-      eventsListEl.appendChild(card);
-    });
+      card.appendChild(progressLine);
+
+      const labelsRow = document.createElement("div");
+      labelsRow.className = "progress-steps-labels";
+      steps.forEach((stepName) => {
+        const span = document.createElement("span");
+        span.textContent = stepName;
+        labelsRow.appendChild(span);
+      });
+      card.appendChild(labelsRow);
+    } else {
+      const noProgress = document.createElement("div");
+      noProgress.className = "flow-progress-label";
+      noProgress.textContent = "此流程尚未設定進度。";
+      card.appendChild(noProgress);
+    }
+
+    card.addEventListener("click", () => openFlowModal(flow, dateStr));
+    eventsListEl.appendChild(card);
+  }
+
+  // ---- 請假卡片 ----
+  function renderLeaveCard(item, index, dateStr) {
+    const lv = item.data;
+
+    const card = document.createElement("div");
+    card.className = "flow-card";
+
+    const title = document.createElement("div");
+    title.className = "flow-title";
+    title.textContent = `${index + 1}. ${lv.title || "請假"}`;
+    card.appendChild(title);
+
+    // 顯示該筆請假區間（若 item.range 有帶）
+    const range = document.createElement("div");
+    range.className = "flow-date-range";
+    if (item.range) {
+      range.textContent = `請假區間：${item.range.start} ～ ${item.range.end}`;
+    } else {
+      range.textContent = "請假";
+    }
+    card.appendChild(range);
+
+    const desc = document.createElement("div");
+    desc.className = "flow-description";
+    desc.textContent = lv.description ? `原因：${lv.description}` : "原因：未填";
+    card.appendChild(desc);
+
+    const label = document.createElement("div");
+    label.className = "flow-progress-label";
+    label.textContent = "狀態：請假";
+    card.appendChild(label);
+
+    card.addEventListener("click", () => openLeaveModal(lv, item.range));
+    eventsListEl.appendChild(card);
   }
 
   function formatDateStr(dateObj) {
@@ -1037,57 +1098,10 @@ body {
   }
 
   function parseDateStr(str) {
-    const [y, m, d] = str.split("-").map(Number);
+    const [y, m, d] = (str || "").split("-").map(Number);
     if (!y || !m || !d) return null;
     return new Date(y, m - 1, d);
   }
-
- function buildLeaveTextIfNeeded(flow, clickedDateStr) {
-  const leave = flow && flow.leave ? flow.leave : null;
-  if (!leave || leave.enabled !== true) return "";
-
-  const label = leave.label || "請假";
-  const note = (leave.note || "").trim();
-
-  const clicked = parseDateStr(clickedDateStr);
-  if (!clicked) return "";
-
-  if (Array.isArray(leave.dates) && leave.dates.length > 0) {
-    const inAnyRange = leave.dates.some(r => {
-      if (!r || !r.start) return false;
-      const s = parseDateStr(r.start);
-      const e = parseDateStr(r.end || r.start);
-      if (!s || !e) return false;
-
-      const start = s <= e ? s : e;
-      const end = s <= e ? e : s;
-
-      return clicked >= start && clicked <= end;
-    });
-
-    if (!inAnyRange) return "";
-
-    return note ? `【${label}】${note}` : `【${label}】`;
-  }
-
-  const rangeMode = leave.rangeMode || "auto";
-
-  if (rangeMode === "always") {
-    return note ? `【${label}】${note}` : `【${label}】`;
-  }
-
-  if (!flow.startDate || !flow.endDate) return note ? `【${label}】${note}` : `【${label}】`;
-
-  const s = parseDateStr(flow.startDate);
-  const e = parseDateStr(flow.endDate);
-  if (!s || !e) return "";
-
-  if (clicked >= s && clicked <= e) {
-    return note ? `【${label}】${note}` : `【${label}】`;
-  }
-
-  return "";
-}
 
   prevMonthBtn.addEventListener("click", () => {
     currentDate.setMonth(currentDate.getMonth() - 1);
@@ -1107,7 +1121,7 @@ body {
     currentDate = new Date();
     selectedDateStr = formatDateStr(currentDate);
     renderCalendar(currentDate);
-    showFlowsForDate(selectedDateStr);
+    showItemsForDate(selectedDateStr);
   });
 
   // ---- PWA app-mode ----
@@ -1143,20 +1157,14 @@ body {
   const modalStepsEl = document.getElementById("modalSteps");
   const modalCloseButtons = document.querySelectorAll("[data-modal-close]");
 
-  function openFlowModal(flow, clickedDateStr) {
-    const title = flow.title || "未命名流程";
-    modalFlowTitleEl.textContent = title;
+  function openFlowModal(flow) {
+    modalFlowTitleEl.textContent = flow.title || "未命名流程";
     modalFlowDateRangeEl.textContent = `流程期間：${flow.startDate} ～ ${flow.endDate}`;
 
-    const baseDesc =
+    modalFlowDescriptionEl.textContent =
       flow.description && flow.description.trim()
-        ? flow.description.trim()
+        ? flow.description
         : "此流程尚未撰寫說明。可於 date.json 的 description 欄位補上說明。";
-
-    const leaveText = buildLeaveTextIfNeeded(flow, clickedDateStr);
-    modalFlowDescriptionEl.textContent = leaveText
-      ? `${baseDesc}\n\n${leaveText}`
-      : baseDesc;
 
     modalStepsEl.innerHTML = "";
 
@@ -1182,13 +1190,9 @@ body {
         const li = document.createElement("li");
         li.className = "modal-step";
 
-        if (isCompleted || idx < currentStep) {
-          li.classList.add("done");
-        } else if (idx === currentStep) {
-          li.classList.add("current");
-        } else {
-          li.classList.add("pending");
-        }
+        if (isCompleted || idx < currentStep) li.classList.add("done");
+        else if (idx === currentStep) li.classList.add("current");
+        else li.classList.add("pending");
 
         li.style.animationDelay = `${idx * 70}ms`;
 
@@ -1208,14 +1212,9 @@ body {
 
         const badge = document.createElement("div");
         badge.className = "modal-step-badge";
-
-        if (isCompleted || idx < currentStep) {
-          badge.textContent = "已完成";
-        } else if (idx === currentStep) {
-          badge.textContent = "進行中";
-        } else {
-          badge.textContent = "尚未開始";
-        }
+        if (isCompleted || idx < currentStep) badge.textContent = "已完成";
+        else if (idx === currentStep) badge.textContent = "進行中";
+        else badge.textContent = "尚未開始";
 
         titleRow.appendChild(stepTitle);
         titleRow.appendChild(badge);
@@ -1229,7 +1228,6 @@ body {
 
         li.appendChild(icon);
         li.appendChild(content);
-
         modalStepsEl.appendChild(li);
       });
     } else {
@@ -1271,9 +1269,62 @@ body {
 
       li.appendChild(icon);
       li.appendChild(content);
-
       modalStepsEl.appendChild(li);
     }
+
+    flowModalBackdrop.classList.add("show");
+  }
+
+  // ✅ 用同一個 modal 來顯示請假（不顯示 steps）
+  function openLeaveModal(lv, range) {
+    modalFlowTitleEl.textContent = lv.title || "請假";
+    if (range) modalFlowDateRangeEl.textContent = `請假區間：${range.start} ～ ${range.end}`;
+    else modalFlowDateRangeEl.textContent = "請假";
+
+    modalFlowDescriptionEl.textContent = lv.description
+      ? `原因：${lv.description}`
+      : "原因：未填";
+
+    modalFlowSubtitleEl.textContent = "請假";
+    modalStepMetaEl.textContent = "狀態：請假";
+
+    // 不顯示步驟
+    modalStepsEl.innerHTML = "";
+    const li = document.createElement("li");
+    li.className = "modal-step current";
+    li.style.animationDelay = "0ms";
+
+    const icon = document.createElement("div");
+    icon.className = "modal-step-icon";
+    icon.textContent = "休";
+
+    const content = document.createElement("div");
+    content.className = "modal-step-content";
+
+    const titleRow = document.createElement("div");
+    titleRow.className = "modal-step-title-row";
+
+    const stepTitle = document.createElement("div");
+    stepTitle.className = "modal-step-title";
+    stepTitle.textContent = "請假";
+
+    const badge = document.createElement("div");
+    badge.className = "modal-step-badge";
+    badge.textContent = "生效";
+
+    titleRow.appendChild(stepTitle);
+    titleRow.appendChild(badge);
+
+    const stepNameEl = document.createElement("div");
+    stepNameEl.className = "modal-step-name";
+    stepNameEl.textContent = "此日期為請假日。";
+
+    content.appendChild(titleRow);
+    content.appendChild(stepNameEl);
+
+    li.appendChild(icon);
+    li.appendChild(content);
+    modalStepsEl.appendChild(li);
 
     flowModalBackdrop.classList.add("show");
   }
@@ -1282,20 +1333,13 @@ body {
     flowModalBackdrop.classList.remove("show");
   }
 
-  modalCloseButtons.forEach((btn) => {
-    btn.addEventListener("click", closeFlowModal);
-  });
-
-  flowModalBackdrop.addEventListener("click", (e) => {
-    if (e.target === flowModalBackdrop) closeFlowModal();
-  });
-
-  window.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") closeFlowModal();
-  });
+  modalCloseButtons.forEach(btn => btn.addEventListener("click", closeFlowModal));
+  flowModalBackdrop.addEventListener("click", (e) => { if (e.target === flowModalBackdrop) closeFlowModal(); });
+  window.addEventListener("keydown", (e) => { if (e.key === "Escape") closeFlowModal(); });
 
   loadFlows();
 </script>
+
 
 </body>
 </html>
