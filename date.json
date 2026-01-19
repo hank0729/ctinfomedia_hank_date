@@ -26,9 +26,10 @@
             "endDate": "2026-01-15",
             "progress": {
                 "steps": [
+                    "刺探",
                     "已理解"
                 ],
-                "currentStep": 1
+                "currentStep": 2
             }
         }
     ]
