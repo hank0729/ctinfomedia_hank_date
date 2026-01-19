@@ -26,10 +26,26 @@
             "endDate": "2026-01-15",
             "progress": {
                 "steps": [
-                    "刺探",
+                    "詢問",
                     "已理解"
                 ],
                 "currentStep": 1
+            }
+        },
+        {
+            "id": "flow-1764655432899",
+            "title": "學習與規畫專案內容",
+            "description": "規劃專案開發",
+            "startDate": "2026-01-16",
+            "endDate": "2026-01-20",
+            "progress": {
+                "steps": [
+                    "查詢專案內容",
+                    "學習專有名詞",
+                    "規劃時間",
+                    "規劃完畢"
+                ],
+                "currentStep": 3
             }
         }
     ],
