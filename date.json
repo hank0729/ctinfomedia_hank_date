@@ -7,14 +7,6 @@
             "description": "建立Nv環境",
             "startDate": "2025-11-27",
             "endDate": "2025-12-09",
-             "leave": {
-    "enabled": true,
-    "label": "請假",
-    "note": "家裡有事",
-    "dates": [
-      { "start": "2026-01-16", "end": "2026-01-16" }
-    ]
-  },
             "progress": {
                 "steps": [
                     "開始",
@@ -40,5 +32,16 @@
                 "currentStep": 1
             }
         }
-    ]
+    ],
+    "leaveFlows": [
+    {
+      "id": "leave-001",
+      "title": "請假",
+      "description": "看牙（下午）",
+      "dates": [
+        { "start": "2026-01-16", "end": "2026-01-16" },
+        { "start": "2026-01-20", "end": "2026-01-22" }
+      ]
+    }
+  ]
 }
